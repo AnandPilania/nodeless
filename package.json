@@ -1,0 +1,10 @@
+{
+    "name": "nodeless",
+    "scripts": {
+        "install": "cd server && npm i && cd ../client && npm i",
+        "dev": "concurrently \"cd server && npm run dev\" \"cd client && npm run dev\""
+    },
+    "devDependencies": {
+        "concurrently": "^10.0.3"
+    }
+}
