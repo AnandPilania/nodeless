@@ -26,7 +26,11 @@ export function DbExplorer() {
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+
+  // Loading states
   const [connecting, setConnecting] = useState(false);
+  const [tablesLoading, setTablesLoading] = useState(false);
+  const [dataLoading, setDataLoading] = useState(false);
 
   useEffect(() => {
     api.listConnections().then(setConnections).catch(() => undefined);
@@ -61,40 +65,54 @@ export function DbExplorer() {
 
   async function selectConnection(id: string) {
     setActiveConnectionId(id);
+    setTables([]); // instantly clear old tables
     setSelectedTable(null);
     setRows(null);
     setSqlResult(null);
     setError(null);
+
+    setTablesLoading(true);
     try {
       const tableList = await api.listTables(id);
       setTables(tableList);
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setTablesLoading(false);
     }
   }
 
   async function selectTable(table: TableInfo) {
     setSelectedTable(table);
     setRows(null);
+    setSqlResult(null);
     setError(null);
     if (!activeConnectionId) return;
+
+    setDataLoading(true);
     try {
       const result = await api.fetchTableRows(activeConnectionId, table.name, table.schema, 100, 0);
       setRows(result);
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setDataLoading(false);
     }
   }
 
   async function runSql() {
     if (!activeConnectionId || !sql.trim()) return;
     setError(null);
+    setSqlResult(null);
+    setDataLoading(true);
     try {
       const result = await api.runQuery(activeConnectionId, sql);
       setSqlResult(result);
     } catch (err) {
       setError((err as Error).message);
       setSqlResult(null);
+    } finally {
+      setDataLoading(false);
     }
   }
 
@@ -113,7 +131,7 @@ export function DbExplorer() {
   const activeDriver = connections.find((c) => c.id === activeConnectionId)?.driver;
 
   return (
-    <div className="db-explorer">
+    <div className="db-explorer" style={{ display: "flex", height: "100%", minWidth: 0 }}>
       <div className="db-sidebar">
         <div className="db-sidebar-header">
           <span className="section-label">Connections</span>
@@ -263,25 +281,38 @@ export function DbExplorer() {
               {activeDriver === "mongodb" ? "Collections" : "Tables"}
             </div>
             <div className="db-table-list">
-              {tables.map((table) => (
-                <div
-                  key={`${table.schema ?? ""}.${table.name}`}
-                  className={`db-table-row ${selectedTable?.name === table.name ? "db-table-active" : ""}`}
-                  onClick={() => selectTable(table)}
-                >
-                  <span className="db-table-name">{table.name}</span>
-                  <span className="db-table-count">{table.approximateRowCount ?? "—"}</span>
+              {tablesLoading ? (
+                <div className="panel-empty-inline">Loading...</div>
+              ) : tables.length > 0 ? (
+                tables.map((table) => (
+                  <div
+                    key={`${table.schema ?? ""}.${table.name}`}
+                    className={`db-table-row ${selectedTable?.name === table.name ? "db-table-active" : ""}`}
+                    onClick={() => selectTable(table)}
+                  >
+                    <span className="db-table-name">{table.name}</span>
+                    <span className="db-table-count">{table.approximateRowCount ?? "—"}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="panel-empty-inline">
+                  No {activeDriver === "mongodb" ? "collections" : "tables"} found
                 </div>
-              ))}
-              {tables.length === 0 && <div className="panel-empty-inline">No {activeDriver === "mongodb" ? "collections" : "tables"} found</div>}
+              )}
             </div>
           </>
         )}
       </div>
 
-      <div className="db-main">
+      <div
+        className="db-main"
+        style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}
+      >
         {selectedTable && (
-          <div className="db-schema-strip">
+          <div
+            className="db-schema-strip"
+            style={{ flex: "none", maxHeight: "150px", overflowY: "auto" }} // Added flex constraints here!
+          >
             {selectedTable.columns.map((col) => (
               <span key={col.name} className={`db-column-chip ${col.isPrimaryKey ? "db-column-pk" : ""}`}>
                 {col.name} <span className="db-column-type">{col.dataType}</span>
@@ -290,7 +321,7 @@ export function DbExplorer() {
           </div>
         )}
 
-        <div className="db-sql-bar">
+        <div className="db-sql-bar" style={{ flex: "none" }}> {/* And here! */}
           <input
             placeholder={
               activeDriver === "mongodb"
@@ -309,18 +340,22 @@ export function DbExplorer() {
           </button>
         </div>
 
-        {error && <div className="db-error">{error}</div>}
+        {error && <div className="db-error" style={{ flex: "none" }}>{error}</div>} {/* And here! */}
 
-        <div className="db-results">
-          {!displayedResult && !error && (
+        <div
+          className="db-results"
+          style={{ flex: 1, minWidth: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}
+        >
+          {dataLoading ? (
+             <div className="panel-empty">Loading data...</div>
+          ) : !displayedResult && !error ? (
             <div className="panel-empty">Select a table or run a query to see results</div>
-          )}
-          {displayedResult && (
+          ) : displayedResult ? (
             <>
-              <div className="db-results-meta">
+              <div className="db-results-meta" style={{ flex: "none" }}>
                 {displayedResult.rowCount} rows · {displayedResult.durationMs}ms
               </div>
-              <div className="db-table-scroll">
+              <div className="db-table-scroll" style={{ flex: 1, overflow: "auto", minHeight: 0 }}>
                 <table className="db-result-table">
                   <thead>
                     <tr>
@@ -341,7 +376,7 @@ export function DbExplorer() {
                 </table>
               </div>
             </>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

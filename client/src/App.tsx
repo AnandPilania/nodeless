@@ -163,7 +163,10 @@ export default function App() {
           </div>
         </aside>
 
-        <main className="center-panel">
+        <main
+          className="center-panel"
+          style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}
+        >
           <div className="tab-bar">
             <button className={`tab ${activeTab === "editor" ? "tab-active" : ""}`} onClick={() => setActiveTab("editor")}>
               Editor
@@ -197,7 +200,10 @@ export default function App() {
               </div>
             )}
           </div>
-          <div className="tab-content">
+          <div
+            className="tab-content"
+            style={{ flex: 1, minWidth: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}
+          >
             {activeTab === "editor" && editorViewMode === "code" && <FileEditor path={selectedFile} />}
             {activeTab === "editor" && editorViewMode === "preview" && <LivePreview entryPath={selectedFile} />}
             {activeTab === "editor" && editorViewMode === "split" && (
