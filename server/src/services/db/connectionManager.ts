@@ -4,6 +4,7 @@ import type { DbAdapter } from "./types.js";
 import { PostgresAdapter } from "./postgresAdapter.js";
 import { MysqlAdapter } from "./mysqlAdapter.js";
 import { SqliteAdapter } from "./sqliteAdapter.js";
+import { MongodbAdapter } from "./mongodbAdapter.js";
 
 interface StoredConnection {
     config: DbConnectionConfig;
@@ -31,6 +32,8 @@ export class DbConnectionManager {
                 return new MysqlAdapter(config);
             case "sqlite":
             // return new SqliteAdapter(config);
+            case "mongodb":
+                return new MongodbAdapter(config);
             default:
                 throw new Error(`Unsupported driver: ${config.driver}`);
         }
@@ -56,7 +59,10 @@ export class DbConnectionManager {
     }
 
     private toSafeConfig(config: DbConnectionConfig): DbConnectionConfigSafe {
-        const { password, ...rest } = config;
-        return { ...rest, hasPassword: Boolean(password) };
+        const { password, connectionString, ...rest } = config;
+        return {
+            ...rest,
+            hasPassword: Boolean(password) || Boolean(connectionString && /:\/\/[^/@]+:[^/@]+@/.test(connectionString))
+        };
     }
 }

@@ -10,7 +10,9 @@ const EMPTY_FORM = {
   user: "",
   password: "",
   database: "",
-  filePath: ""
+  filePath: "",
+  connectionString: "",
+  mongoUseUri: false
 };
 
 export function DbExplorer() {
@@ -34,13 +36,15 @@ export function DbExplorer() {
     setConnecting(true);
     setError(null);
     try {
+      const useConnectionString = form.driver === "mongodb" && form.mongoUseUri;
       const config = await api.createConnection({
         driver: form.driver,
         name: form.name || `${form.driver}-connection`,
-        host: form.driver !== "sqlite" ? form.host : undefined,
-        port: form.port ? Number(form.port) : undefined,
-        user: form.driver !== "sqlite" ? form.user : undefined,
-        password: form.driver !== "sqlite" ? form.password : undefined,
+        connectionString: useConnectionString ? form.connectionString : undefined,
+        host: form.driver !== "sqlite" && !useConnectionString ? form.host : undefined,
+        port: form.port && !useConnectionString ? Number(form.port) : undefined,
+        user: form.driver !== "sqlite" && !useConnectionString ? form.user : undefined,
+        password: form.driver !== "sqlite" && !useConnectionString ? form.password : undefined,
         database: form.driver !== "sqlite" ? form.database : undefined,
         filePath: form.driver === "sqlite" ? form.filePath : undefined
       });
@@ -106,6 +110,7 @@ export function DbExplorer() {
   }
 
   const displayedResult = sqlResult ?? rows;
+  const activeDriver = connections.find((c) => c.id === activeConnectionId)?.driver;
 
   return (
     <div className="db-explorer">
@@ -126,6 +131,7 @@ export function DbExplorer() {
               <option value="sqlite">SQLite</option>
               <option value="postgres">PostgreSQL</option>
               <option value="mysql">MySQL</option>
+              <option value="mongodb">MongoDB</option>
             </select>
             <input
               placeholder="connection name"
@@ -138,6 +144,61 @@ export function DbExplorer() {
                 value={form.filePath}
                 onChange={(e) => setForm((f) => ({ ...f, filePath: e.target.value }))}
               />
+            ) : form.driver === "mongodb" ? (
+              <>
+                <div className="db-form-toggle">
+                  <button
+                    type="button"
+                    className={`db-form-toggle-btn ${!form.mongoUseUri ? "db-form-toggle-btn-active" : ""}`}
+                    onClick={() => setForm((f) => ({ ...f, mongoUseUri: false }))}
+                  >
+                    host / port
+                  </button>
+                  <button
+                    type="button"
+                    className={`db-form-toggle-btn ${form.mongoUseUri ? "db-form-toggle-btn-active" : ""}`}
+                    onClick={() => setForm((f) => ({ ...f, mongoUseUri: true }))}
+                  >
+                    connection string
+                  </button>
+                </div>
+                {form.mongoUseUri ? (
+                  <input
+                    placeholder="mongodb+srv://user:pass@cluster.mongodb.net"
+                    value={form.connectionString}
+                    onChange={(e) => setForm((f) => ({ ...f, connectionString: e.target.value }))}
+                  />
+                ) : (
+                  <>
+                    <input
+                      placeholder="host"
+                      value={form.host}
+                      onChange={(e) => setForm((f) => ({ ...f, host: e.target.value }))}
+                    />
+                    <input
+                      placeholder="port (27017)"
+                      value={form.port}
+                      onChange={(e) => setForm((f) => ({ ...f, port: e.target.value }))}
+                    />
+                    <input
+                      placeholder="user (optional)"
+                      value={form.user}
+                      onChange={(e) => setForm((f) => ({ ...f, user: e.target.value }))}
+                    />
+                    <input
+                      type="password"
+                      placeholder="password (optional)"
+                      value={form.password}
+                      onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                    />
+                  </>
+                )}
+                <input
+                  placeholder="database"
+                  value={form.database}
+                  onChange={(e) => setForm((f) => ({ ...f, database: e.target.value }))}
+                />
+              </>
             ) : (
               <>
                 <input
@@ -198,7 +259,9 @@ export function DbExplorer() {
 
         {activeConnectionId && (
           <>
-            <div className="section-label section-label-spaced">Tables</div>
+            <div className="section-label section-label-spaced">
+              {activeDriver === "mongodb" ? "Collections" : "Tables"}
+            </div>
             <div className="db-table-list">
               {tables.map((table) => (
                 <div
@@ -210,7 +273,7 @@ export function DbExplorer() {
                   <span className="db-table-count">{table.approximateRowCount ?? "—"}</span>
                 </div>
               ))}
-              {tables.length === 0 && <div className="panel-empty-inline">No tables found</div>}
+              {tables.length === 0 && <div className="panel-empty-inline">No {activeDriver === "mongodb" ? "collections" : "tables"} found</div>}
             </div>
           </>
         )}
@@ -229,7 +292,11 @@ export function DbExplorer() {
 
         <div className="db-sql-bar">
           <input
-            placeholder="SELECT * FROM ..."
+            placeholder={
+              activeDriver === "mongodb"
+                ? 'collection.find({ field: value }) or .aggregate([...])'
+                : "SELECT * FROM ..."
+            }
             value={sql}
             onChange={(e) => setSql(e.target.value)}
             onKeyDown={(e) => {

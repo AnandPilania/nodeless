@@ -1,5 +1,6 @@
 {
     "name": "nodeless",
+    "version": "0.0.1",
     "scripts": {
         "install": "cd server && npm i && cd ../client && npm i",
         "dev": "concurrently \"cd server && npm run dev\" \"cd client && npm run dev\""

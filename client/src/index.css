@@ -923,6 +923,27 @@ select {
     border-color: var(--accent-dim);
 }
 
+.db-form-toggle {
+    display: flex;
+    gap: 2px;
+}
+
+.db-form-toggle-btn {
+    flex: 1;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-hair);
+    color: var(--text-muted);
+    font-size: 10.5px;
+    padding: 5px 6px;
+    border-radius: 4px;
+}
+
+.db-form-toggle-btn-active {
+    color: var(--accent);
+    border-color: var(--accent-dim);
+    background: var(--accent-glow);
+}
+
 .db-connect-btn {
     background: var(--accent);
     border: none;
