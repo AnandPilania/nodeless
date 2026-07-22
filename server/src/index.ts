@@ -5,6 +5,7 @@ import { createWorkspaceRouter } from "./routes/workspace.js";
 import { createRunRouter } from "./routes/run.js";
 import { createSnippetRouter } from "./routes/snippet.js";
 import { createDbRouter } from "./routes/db.js";
+import { createPreviewRouter } from "./routes/preview.js";
 import { ProcessRunner } from "./services/runner.js";
 import { DbConnectionManager } from "./services/db/connectionManager.js";
 import { attachWsBridge } from "./services/wsBridge.js";
@@ -47,6 +48,8 @@ async function main(): Promise<void> {
   app.use("/api/run", createRunRouter(runner, () => workspaceRoot));
   app.use("/api/snippet", createSnippetRouter());
   app.use("/api/db", createDbRouter(dbManager));
+  app.use("/api/preview", createPreviewRouter());
+  app.use("/preview", createPreviewRouter());
 
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", workspaceRoot });

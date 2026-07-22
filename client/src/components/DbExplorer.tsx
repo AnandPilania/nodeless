@@ -3,7 +3,7 @@ import { api } from "../api/client";
 import type { DbConnectionConfigSafe, DbDriver, QueryResult, TableInfo } from "../types";
 
 const EMPTY_FORM = {
-  driver: "postgres" as DbDriver,
+  driver: "sqlite" as DbDriver,
   name: "",
   host: "localhost",
   port: "",

@@ -3,6 +3,7 @@ import { api } from "./api/client";
 import { FileExplorer } from "./components/FileExplorer";
 import { PackagePanel } from "./components/PackagePanel";
 import { FileEditor } from "./components/FileEditor";
+import { LivePreview } from "./components/LivePreview";
 import { SnippetRunner } from "./components/SnippetRunner";
 import { DbExplorer } from "./components/DbExplorer";
 import { OutputConsole } from "./components/OutputConsole";
@@ -10,6 +11,7 @@ import { useRunSocket } from "./hooks/useRunSocket";
 import type { FileNode, PackageInfo, ProcessOutputEvent } from "./types";
 
 type CenterTab = "editor" | "snippet" | "database";
+type EditorViewMode = "code" | "split" | "preview";
 
 interface ConsoleLine {
   id: string;
@@ -26,6 +28,7 @@ export default function App() {
   const [pkg, setPkg] = useState<PackageInfo | null>(null);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<CenterTab>("editor");
+  const [editorViewMode, setEditorViewMode] = useState<EditorViewMode>("code");
 
   const [consoleLines, setConsoleLines] = useState<ConsoleLine[]>([]);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
@@ -171,9 +174,42 @@ export default function App() {
             <button className={`tab ${activeTab === "database" ? "tab-active" : ""}`} onClick={() => setActiveTab("database")}>
               Database
             </button>
+            {activeTab === "editor" && (
+              <div className="view-mode-toggle">
+                <button
+                  className={`view-mode-btn ${editorViewMode === "code" ? "view-mode-btn-active" : ""}`}
+                  onClick={() => setEditorViewMode("code")}
+                >
+                  code
+                </button>
+                <button
+                  className={`view-mode-btn ${editorViewMode === "split" ? "view-mode-btn-active" : ""}`}
+                  onClick={() => setEditorViewMode("split")}
+                >
+                  split
+                </button>
+                <button
+                  className={`view-mode-btn ${editorViewMode === "preview" ? "view-mode-btn-active" : ""}`}
+                  onClick={() => setEditorViewMode("preview")}
+                >
+                  preview
+                </button>
+              </div>
+            )}
           </div>
           <div className="tab-content">
-            {activeTab === "editor" && <FileEditor path={selectedFile} />}
+            {activeTab === "editor" && editorViewMode === "code" && <FileEditor path={selectedFile} />}
+            {activeTab === "editor" && editorViewMode === "preview" && <LivePreview entryPath={selectedFile} />}
+            {activeTab === "editor" && editorViewMode === "split" && (
+              <div className="editor-split">
+                <div className="editor-split-pane">
+                  <FileEditor path={selectedFile} />
+                </div>
+                <div className="editor-split-pane">
+                  <LivePreview entryPath={selectedFile} />
+                </div>
+              </div>
+            )}
             {activeTab === "snippet" && <SnippetRunner />}
             {activeTab === "database" && <DbExplorer />}
           </div>

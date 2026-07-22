@@ -5,6 +5,7 @@ import {
   readPackageInfo,
   writeFileContent
 } from "../services/workspace.js";
+import { collectLocalModuleGraph } from "../services/moduleGraph.js";
 
 export function createWorkspaceRouter(getRoot: () => string): Router {
   const router = Router();
@@ -54,6 +55,20 @@ export function createWorkspaceRouter(getRoot: () => string): Router {
     try {
       await writeFileContent(getRoot(), relativePath, content);
       res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  router.get("/module-graph", async (req, res) => {
+    const entry = req.query.entry as string | undefined;
+    if (!entry) {
+      res.status(400).json({ error: "Missing entry query parameter" });
+      return;
+    }
+    try {
+      const modules = await collectLocalModuleGraph(getRoot(), entry);
+      res.json({ modules });
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
     }
