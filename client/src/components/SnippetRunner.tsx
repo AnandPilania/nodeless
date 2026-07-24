@@ -1,6 +1,8 @@
 import Editor from "@monaco-editor/react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { api } from "../api/client";
+import { ResizeHandle } from "./ResizeHandle";
+import { usePersistentState } from "../hooks/usePersistentState";
 import type { SnippetExecutionResult } from "../types";
 
 const DEFAULT_SNIPPET = `const items = [1, 2, 3, 4, 5];
@@ -18,6 +20,8 @@ export function SnippetRunner() {
   const [code, setCode] = useState(DEFAULT_SNIPPET);
   const [result, setResult] = useState<SnippetExecutionResult | null>(null);
   const [executing, setExecuting] = useState(false);
+  const [layout, setLayout] = usePersistentState("nodeless:snippet-layout", { editorFraction: 0.55 });
+  const containerRef = useRef<HTMLDivElement>(null);
 
   async function handleRun() {
     setExecuting(true);
@@ -38,8 +42,8 @@ export function SnippetRunner() {
   }
 
   return (
-    <div className="snippet-runner">
-      <div className="snippet-editor-wrap">
+    <div className="snippet-runner" ref={containerRef}>
+      <div className="snippet-editor-wrap" style={{ flexBasis: `${layout.editorFraction * 100}%` }}>
         <Editor
           height="100%"
           defaultLanguage="javascript"
@@ -55,6 +59,14 @@ export function SnippetRunner() {
           }}
         />
       </div>
+      <ResizeHandle
+        axis="vertical"
+        currentValue={layout.editorFraction}
+        minValue={0.2}
+        maxValue={0.8}
+        onChange={(next) => setLayout((prev) => ({ ...prev, editorFraction: next }))}
+        containerRef={containerRef}
+      />
       <div className="snippet-toolbar">
         <button className="snippet-run-btn" onClick={handleRun} disabled={executing}>
           {executing ? "executing…" : "run snippet"}

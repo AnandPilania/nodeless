@@ -8,18 +8,6 @@ import type {
     TableInfo
 } from "../types";
 
-/**
- * The preview iframe intentionally does NOT go through the Vite dev proxy: it needs
- * to be served from the backend's own origin (a different host:port than this
- * frontend app) so that sandbox="allow-scripts allow-same-origin" isolates it from
- * the real nodeless app's cookies/localStorage/DOM. Everything else in this file
- * uses relative /api paths, which the dev proxy forwards; this one constant is the
- * only place a real absolute backend URL is needed.
- *
- * Override via VITE_BACKEND_ORIGIN if the backend isn't on localhost:4310 (e.g. a
- * remote dev container, or a production deployment where frontend and backend are
- * on different hosts).
- */
 export const BACKEND_ORIGIN: string =
     (import.meta.env.VITE_BACKEND_ORIGIN as string | undefined) ?? "http://localhost:4310";
 

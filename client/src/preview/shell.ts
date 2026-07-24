@@ -1,9 +1,3 @@
-// Defense-in-depth: with allow-same-origin now set on the preview iframe (see
-// LivePreview.tsx), document.cookie/localStorage/sessionStorage work natively and
-// this shim's own overrides quietly no-op (document.cookie is an unforgeable
-// platform property and cannot be redefined, so the try/catch below is expected to
-// swallow a TypeError in that case). It's kept in case a future "strict" preview
-// mode drops allow-same-origin again, in which case this becomes load-bearing.
 export const SANDBOX_COMPAT_SHIM = `
     <script>
       (function () {
@@ -67,20 +61,8 @@ export interface ShellOptions {
     entryModuleId: string;
     externalSpecifiers: string[];
     dependencyVersions: Record<string, string>;
-    /**
-     * JS source (runs after the module system + externals are ready) responsible for
-     * instantiating the entry module and mounting it into #preview-root.
-     * Has access to: instantiate(id), externalModuleCache, loadExternal(specifier), reportError(msg, stack)
-     */
     mountScript: string;
     headInjection: string;
-    /**
-     * If the real project's index.html mounts into an element with a specific id
-     * (commonly "root", but sometimes "app" or a custom name), that id gets its own
-     * div in the preview DOM so entry code that calls
-     * document.getElementById(thatId) directly finds it, in addition to the always
-     *-present "root" and "preview-root" fallbacks.
-     */
     mountElementId?: string;
 }
 

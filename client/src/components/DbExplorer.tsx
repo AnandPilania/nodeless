@@ -27,7 +27,6 @@ export function DbExplorer() {
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
 
-  // Loading states
   const [connecting, setConnecting] = useState(false);
   const [tablesLoading, setTablesLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
@@ -65,7 +64,7 @@ export function DbExplorer() {
 
   async function selectConnection(id: string) {
     setActiveConnectionId(id);
-    setTables([]); // instantly clear old tables
+    setTables([]);
     setSelectedTable(null);
     setRows(null);
     setSqlResult(null);
@@ -311,7 +310,7 @@ export function DbExplorer() {
         {selectedTable && (
           <div
             className="db-schema-strip"
-            style={{ flex: "none", maxHeight: "150px", overflowY: "auto" }} // Added flex constraints here!
+            style={{ flex: "none", maxHeight: "150px", overflowY: "auto" }}
           >
             {selectedTable.columns.map((col) => (
               <span key={col.name} className={`db-column-chip ${col.isPrimaryKey ? "db-column-pk" : ""}`}>
@@ -321,7 +320,7 @@ export function DbExplorer() {
           </div>
         )}
 
-        <div className="db-sql-bar" style={{ flex: "none" }}> {/* And here! */}
+        <div className="db-sql-bar" style={{ flex: "none" }}>
           <input
             placeholder={
               activeDriver === "mongodb"
@@ -340,7 +339,7 @@ export function DbExplorer() {
           </button>
         </div>
 
-        {error && <div className="db-error" style={{ flex: "none" }}>{error}</div>} {/* And here! */}
+        {error && <div className="db-error" style={{ flex: "none" }}>{error}</div>}
 
         <div
           className="db-results"
