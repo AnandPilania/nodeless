@@ -1,6 +1,10 @@
 {
-    "name": "nodeless",
-    "version": "0.0.1",
+    "name": "@pilaniaanand/nodeless",
+    "version": "0.0.2",
+    "workspaces": [
+        "client",
+        "server"
+    ],
     "scripts": {
         "install": "cd server && npm i && cd ../client && npm i",
         "dev": "concurrently \"cd server && npm run dev\" \"cd client && npm run dev\""

@@ -31,7 +31,7 @@ export class DbConnectionManager {
             case "mysql":
                 return new MysqlAdapter(config);
             case "sqlite":
-            // return new SqliteAdapter(config);
+                return new SqliteAdapter(config);
             case "mongodb":
                 return new MongodbAdapter(config);
             default:
