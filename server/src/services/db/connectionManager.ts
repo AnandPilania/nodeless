@@ -30,10 +30,10 @@ export class DbConnectionManager {
                 return new PostgresAdapter(config);
             case "mysql":
                 return new MysqlAdapter(config);
-            case "sqlite":
-                return new SqliteAdapter(config);
             case "mongodb":
                 return new MongodbAdapter(config);
+            case "sqlite":
+                return new SqliteAdapter(config);
             default:
                 throw new Error(`Unsupported driver: ${config.driver}`);
         }

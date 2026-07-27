@@ -1,5 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
+import { ResizeHandle } from "./ResizeHandle";
+import { usePersistentState } from "../hooks/usePersistentState";
+import { useBreakpoint } from "../hooks/useBreakpoint";
 import type { DbConnectionConfigSafe, DbDriver, QueryResult, TableInfo } from "../types";
 
 const EMPTY_FORM = {
@@ -15,6 +18,11 @@ const EMPTY_FORM = {
   mongoUseUri: false
 };
 
+const SIDEBAR_MIN = 160;
+const SIDEBAR_MAX = 420;
+const QUERY_MIN_FRACTION = 0.08;
+const QUERY_MAX_FRACTION = 0.7;
+
 export function DbExplorer() {
   const [connections, setConnections] = useState<DbConnectionConfigSafe[]>([]);
   const [activeConnectionId, setActiveConnectionId] = useState<string | null>(null);
@@ -26,10 +34,17 @@ export function DbExplorer() {
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
-
   const [connecting, setConnecting] = useState(false);
   const [tablesLoading, setTablesLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
+  const [layout, setLayout] = usePersistentState("nodeless:db-layout", {
+    sidebarWidth: 220,
+    queryFraction: 0.18
+  });
+  const mainRef = useRef<HTMLDivElement>(null);
+  const breakpoint = useBreakpoint();
+  const isDesktop = breakpoint === "desktop";
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     api.listConnections().then(setConnections).catch(() => undefined);
@@ -130,8 +145,21 @@ export function DbExplorer() {
   const activeDriver = connections.find((c) => c.id === activeConnectionId)?.driver;
 
   return (
-    <div className="db-explorer" style={{ display: "flex", height: "100%", minWidth: 0 }}>
-      <div className="db-sidebar">
+    <div className={`db-explorer ${!isDesktop ? "db-explorer-stacked" : ""}`}>
+      {!isDesktop && (
+        <button className="db-mobile-sidebar-toggle" onClick={() => setMobileSidebarOpen((v) => !v)}>
+          <span>Connections {activeDriver ? `· ${connections.find((c) => c.id === activeConnectionId)?.name}` : ""}</span>
+          <span className={`db-mobile-sidebar-caret ${mobileSidebarOpen ? "db-mobile-sidebar-caret-open" : ""}`}>▾</span>
+        </button>
+      )}
+      <div
+        className="db-sidebar"
+        style={
+          isDesktop
+            ? { width: layout.sidebarWidth, flexBasis: layout.sidebarWidth }
+            : { display: mobileSidebarOpen ? "flex" : "none" }
+        }
+      >
         <div className="db-sidebar-header">
           <span className="section-label">Connections</span>
           <button className="db-add-btn" onClick={() => setFormOpen((v) => !v)}>
@@ -282,7 +310,7 @@ export function DbExplorer() {
             <div className="db-table-list">
               {tablesLoading ? (
                 <div className="panel-empty-inline">Loading...</div>
-              ) : tables.length > 0 ? (
+              ) : (
                 tables.map((table) => (
                   <div
                     key={`${table.schema ?? ""}.${table.name}`}
@@ -293,24 +321,26 @@ export function DbExplorer() {
                     <span className="db-table-count">{table.approximateRowCount ?? "—"}</span>
                   </div>
                 ))
-              ) : (
-                <div className="panel-empty-inline">
-                  No {activeDriver === "mongodb" ? "collections" : "tables"} found
-                </div>
               )}
+              {!tablesLoading && tables.length === 0 && <div className="panel-empty-inline">No {activeDriver === "mongodb" ? "collections" : "tables"} found</div>}
             </div>
           </>
         )}
       </div>
 
-      <div
-        className="db-main"
-        style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}
-      >
+      {isDesktop && (
+        <ResizeHandle
+          axis="horizontal"
+          currentValue={layout.sidebarWidth}
+          minValue={SIDEBAR_MIN}
+          maxValue={SIDEBAR_MAX}
+          onChange={(next) => setLayout((prev) => ({ ...prev, sidebarWidth: next }))}
+        />
+      )}
+
+      <div className="db-main" ref={mainRef}>
         {selectedTable && (
-          <div
-            className="db-schema-strip"
-            style={{ flex: "none", maxHeight: "150px", overflowY: "auto" }}
+          <div className="db-schema-strip" style={{ flex: "none", maxHeight: "150px", overflowY: "auto" }}
           >
             {selectedTable.columns.map((col) => (
               <span key={col.name} className={`db-column-chip ${col.isPrimaryKey ? "db-column-pk" : ""}`}>
@@ -320,41 +350,61 @@ export function DbExplorer() {
           </div>
         )}
 
-        <div className="db-sql-bar" style={{ flex: "none" }}>
-          <input
+        <div
+          className="db-query-pane"
+          style={isDesktop ? { flexBasis: `${layout.queryFraction * 100}%` } : { flexBasis: "140px" }}
+        >
+          <textarea
+            className="db-query-textarea"
             placeholder={
               activeDriver === "mongodb"
-                ? 'collection.find({ field: value }) or .aggregate([...])'
+                ? "collection.find({ field: value })\ncollection.aggregate([...])"
                 : "SELECT * FROM ..."
             }
             value={sql}
             onChange={(e) => setSql(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") runSql();
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                runSql();
+              }
             }}
             disabled={!activeConnectionId}
+            spellCheck={false}
           />
-          <button onClick={runSql} disabled={!activeConnectionId || !sql.trim()}>
-            run
-          </button>
+          <div className="db-query-actions">
+            <span className="db-query-hint">⌘/Ctrl + Enter to run</span>
+            <button onClick={runSql} disabled={!activeConnectionId || !sql.trim()}>
+              run
+            </button>
+          </div>
         </div>
 
-        {error && <div className="db-error" style={{ flex: "none" }}>{error}</div>}
+        {isDesktop && (
+          <ResizeHandle
+            axis="vertical"
+            currentValue={layout.queryFraction}
+            minValue={QUERY_MIN_FRACTION}
+            maxValue={QUERY_MAX_FRACTION}
+            onChange={(next) => setLayout((prev) => ({ ...prev, queryFraction: next }))}
+            containerRef={mainRef}
+          />
+        )}
 
-        <div
-          className="db-results"
-          style={{ flex: 1, minWidth: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}
-        >
+        {error && <div className="db-error">{error}</div>}
+
+        <div className="db-results">
           {dataLoading ? (
              <div className="panel-empty">Loading data...</div>
-          ) : !displayedResult && !error ? (
+          ) : !displayedResult && !error && (
             <div className="panel-empty">Select a table or run a query to see results</div>
-          ) : displayedResult ? (
+          )}
+          {displayedResult && (
             <>
-              <div className="db-results-meta" style={{ flex: "none" }}>
+              <div className="db-results-meta">
                 {displayedResult.rowCount} rows · {displayedResult.durationMs}ms
               </div>
-              <div className="db-table-scroll" style={{ flex: 1, overflow: "auto", minHeight: 0 }}>
+              <div className="db-table-scroll">
                 <table className="db-result-table">
                   <thead>
                     <tr>
@@ -375,7 +425,7 @@ export function DbExplorer() {
                 </table>
               </div>
             </>
-          ) : null}
+          )}
         </div>
       </div>
     </div>

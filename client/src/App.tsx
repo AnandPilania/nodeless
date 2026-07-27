@@ -12,10 +12,12 @@ import { LayoutMenu, type LayoutVisibility } from "./components/LayoutMenu";
 import { useRunSocket } from "./hooks/useRunSocket";
 import { usePersistentState } from "./hooks/usePersistentState";
 import { useWindowSize } from "./hooks/useWindowSize";
+import { useBreakpoint } from "./hooks/useBreakpoint";
 import type { FileNode, PackageInfo, ProcessOutputEvent } from "./types";
 
 type CenterTab = "editor" | "snippet" | "database";
 type EditorViewMode = "code" | "split" | "preview";
+type MobileDrawer = "none" | "files" | "console";
 
 interface ConsoleLine {
   id: string;
@@ -59,6 +61,15 @@ export default function App() {
     DEFAULT_VISIBILITY
   );
   const windowSize = useWindowSize();
+  const breakpoint = useBreakpoint();
+  const isDesktop = breakpoint === "desktop";
+  const [mobileDrawer, setMobileDrawer] = useState<MobileDrawer>("none");
+
+  useEffect(() => {
+    if (isDesktop) {
+      setMobileDrawer("none");
+    }
+  }, [isDesktop]);
 
   const [consoleLines, setConsoleLines] = useState<ConsoleLine[]>([]);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
@@ -165,6 +176,14 @@ export default function App() {
     resetVisibility();
   }
 
+  function handleSelectFile(path: string) {
+    setSelectedFile(path);
+    setActiveTab("editor");
+    if (!isDesktop) {
+      setMobileDrawer("none");
+    }
+  }
+
   const showLeftPanel = visibility.showFiles || visibility.showPackage;
 
   const availableForBothSidebars = Math.max(0, windowSize.width - CENTER_MIN);
@@ -182,6 +201,17 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
+        {!isDesktop && showLeftPanel && (
+          <button
+            className="topbar-icon-btn"
+            onClick={() => setMobileDrawer((prev) => (prev === "files" ? "none" : "files"))}
+            aria-label="Toggle files panel"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            </svg>
+          </button>
+        )}
         <div className="topbar-brand">
           <span className="topbar-mark">◆</span>
           nodeless
@@ -196,11 +226,24 @@ export default function App() {
           <button onClick={handleSetRoot}>open</button>
         </div>
         <div className="topbar-status">{workspaceRoot && <span className="topbar-root-label">{workspaceRoot}</span>}</div>
+        {!isDesktop && visibility.showConsole && (
+          <button
+            className="topbar-icon-btn"
+            onClick={() => setMobileDrawer((prev) => (prev === "console" ? "none" : "console"))}
+            aria-label="Toggle output console"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+              <path d="M4 6.5l2.2 1.7L4 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            {activeRunId && <span className="topbar-icon-btn-dot" />}
+          </button>
+        )}
         <LayoutMenu visibility={visibility} onToggle={handleToggleVisibility} onResetLayout={handleResetLayout} />
       </header>
 
       <div className="workbench">
-        {showLeftPanel && (
+        {showLeftPanel && isDesktop && (
           <>
             <aside className="left-panel" style={{ width: effectiveLeftWidth, flexBasis: effectiveLeftWidth }}>
               {visibility.showFiles && (
@@ -216,10 +259,7 @@ export default function App() {
                   <FileExplorer
                     tree={tree}
                     selectedPath={selectedFile}
-                    onSelectFile={(path) => {
-                      setSelectedFile(path);
-                      setActiveTab("editor");
-                    }}
+                    onSelectFile={handleSelectFile}
                     onRunFile={handleRunFile}
                   />
                 </div>
@@ -229,7 +269,7 @@ export default function App() {
                   axis="vertical"
                   currentValue={layout.treeHeight}
                   minValue={120}
-                  maxValue={400}
+                  maxValue={600}
                   onChange={(next) => setLayout((prev) => ({ ...prev, treeHeight: next }))}
                 />
               )}
@@ -287,18 +327,23 @@ export default function App() {
             {activeTab === "editor" && editorViewMode === "code" && <FileEditor path={selectedFile} />}
             {activeTab === "editor" && editorViewMode === "preview" && <LivePreview entryPath={selectedFile} />}
             {activeTab === "editor" && editorViewMode === "split" && (
-              <div className="editor-split" ref={editorSplitRef}>
-                <div className="editor-split-pane" style={{ flexBasis: `${layout.splitEditorWidth * 100}%` }}>
+              <div className={`editor-split ${!isDesktop ? "editor-split-stacked" : ""}`} ref={editorSplitRef}>
+                <div
+                  className="editor-split-pane"
+                  style={isDesktop ? { flexBasis: `${layout.splitEditorWidth * 100}%` } : { flex: 1 }}
+                >
                   <FileEditor path={selectedFile} />
                 </div>
-                <ResizeHandle
-                  axis="horizontal"
-                  currentValue={layout.splitEditorWidth}
-                  minValue={0.15}
-                  maxValue={0.85}
-                  onChange={(next) => setLayout((prev) => ({ ...prev, splitEditorWidth: next }))}
-                  containerRef={editorSplitRef}
-                />
+                {isDesktop && (
+                  <ResizeHandle
+                    axis="horizontal"
+                    currentValue={layout.splitEditorWidth}
+                    minValue={0.15}
+                    maxValue={0.85}
+                    onChange={(next) => setLayout((prev) => ({ ...prev, splitEditorWidth: next }))}
+                    containerRef={editorSplitRef}
+                  />
+                )}
                 <div className="editor-split-pane" style={{ flex: 1 }}>
                   <LivePreview entryPath={selectedFile} />
                 </div>
@@ -309,7 +354,7 @@ export default function App() {
           </div>
         </main>
 
-        {visibility.showConsole && (
+        {visibility.showConsole && isDesktop && (
           <>
             <ResizeHandle
               axis="horizontal"
@@ -331,6 +376,50 @@ export default function App() {
           </>
         )}
       </div>
+
+      {!isDesktop && mobileDrawer !== "none" && (
+        <div className="mobile-drawer-overlay" onClick={() => setMobileDrawer("none")}>
+          <div className={`mobile-drawer mobile-drawer-${mobileDrawer}`} onClick={(e) => e.stopPropagation()}>
+            <div className="mobile-drawer-header">
+              <span>{mobileDrawer === "files" ? "Files" : "Output"}</span>
+              <button className="mobile-drawer-close" onClick={() => setMobileDrawer("none")} aria-label="Close">
+                ×
+              </button>
+            </div>
+            {mobileDrawer === "files" && (
+              <div className="mobile-drawer-body">
+                {visibility.showFiles && (
+                  <div className="panel-section panel-section-tree" style={{ flex: visibility.showPackage ? "1 1 55%" : 1 }}>
+                    <div className="section-label">Files</div>
+                    <FileExplorer
+                      tree={tree}
+                      selectedPath={selectedFile}
+                      onSelectFile={handleSelectFile}
+                      onRunFile={handleRunFile}
+                    />
+                  </div>
+                )}
+                {visibility.showPackage && (
+                  <div className="panel-section panel-section-package" style={{ flex: visibility.showFiles ? "1 1 45%" : 1 }}>
+                    <PackagePanel pkg={pkg} onRunScript={handleRunScript} runningScripts={runningScripts} />
+                  </div>
+                )}
+              </div>
+            )}
+            {mobileDrawer === "console" && (
+              <div className="mobile-drawer-body">
+                <OutputConsole
+                  lines={consoleLines}
+                  activeRunId={activeRunId}
+                  activeLabel={activeLabel}
+                  onStop={handleStop}
+                  onClear={() => setConsoleLines([])}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
