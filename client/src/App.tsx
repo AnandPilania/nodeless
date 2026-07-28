@@ -9,6 +9,7 @@ import { DbExplorer } from "./components/DbExplorer";
 import { OutputConsole } from "./components/OutputConsole";
 import { ResizeHandle } from "./components/ResizeHandle";
 import { LayoutMenu, type LayoutVisibility } from "./components/LayoutMenu";
+import { FolderPicker } from "./components/FolderPicker";
 import { useRunSocket } from "./hooks/useRunSocket";
 import { usePersistentState } from "./hooks/usePersistentState";
 import { useWindowSize } from "./hooks/useWindowSize";
@@ -48,7 +49,7 @@ const CENTER_MIN = 280;
 
 export default function App() {
   const [workspaceRoot, setWorkspaceRoot] = useState("");
-  const [rootInput, setRootInput] = useState("");
+  const [folderPickerOpen, setFolderPickerOpen] = useState(false);
   const [tree, setTree] = useState<FileNode | null>(null);
   const [pkg, setPkg] = useState<PackageInfo | null>(null);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
@@ -81,7 +82,6 @@ export default function App() {
   const loadWorkspace = useCallback(async () => {
     const rootRes = await api.getWorkspaceRoot();
     setWorkspaceRoot(rootRes.root);
-    setRootInput(rootRes.root);
     const [treeRes, pkgRes] = await Promise.all([
       api.getFileTree().catch(() => null),
       api.getPackageInfo().catch(() => null)
@@ -140,8 +140,10 @@ export default function App() {
 
   useRunSocket(handleWsEvent);
 
-  async function handleSetRoot() {
-    await api.setWorkspaceRoot(rootInput);
+  async function handleSetRoot(newRoot: string) {
+    await api.setWorkspaceRoot(newRoot);
+    setSelectedFile(null);
+    setFolderPickerOpen(false);
     await loadWorkspace();
   }
 
@@ -217,15 +219,19 @@ export default function App() {
           nodeless
         </div>
         <div className="topbar-root">
-          <input
-            value={rootInput}
-            onChange={(e) => setRootInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSetRoot()}
-            spellCheck={false}
-          />
-          <button onClick={handleSetRoot}>open</button>
+          <button className="topbar-open-folder-btn" onClick={() => setFolderPickerOpen(true)}>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M1.5 4.5a1 1 0 0 1 1-1h3.6l1.2 1.5h6.2a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-8z"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span className="topbar-open-folder-label">{workspaceRoot || "Open folder…"}</span>
+          </button>
         </div>
-        <div className="topbar-status">{workspaceRoot && <span className="topbar-root-label">{workspaceRoot}</span>}</div>
+        <div className="topbar-status"></div>
         {!isDesktop && visibility.showConsole && (
           <button
             className="topbar-icon-btn"
@@ -419,6 +425,14 @@ export default function App() {
             )}
           </div>
         </div>
+      )}
+
+      {folderPickerOpen && (
+        <FolderPicker
+          initialPath={workspaceRoot || "/"}
+          onSelect={handleSetRoot}
+          onClose={() => setFolderPickerOpen(false)}
+        />
       )}
     </div>
   );
