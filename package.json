@@ -1,6 +1,6 @@
 {
     "name": "@pilaniaanand/nodeless",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "workspaces": [
         "client",
         "server"
