@@ -71,7 +71,7 @@ export const svelteProvider: PreviewProvider = {
             return `${IMPORT_META_SHIM_DECLARATION}\n${result.code}`;
         }
 
-        const bundle = buildGraphBundle(input.entryPath, input.modules, transpile);
+        const bundle = buildGraphBundle(input.entryPath, input.modules, transpile, input.aliases ?? []);
 
         const externals = new Set(bundle.externalSpecifiers);
         externals.add("svelte");
@@ -127,7 +127,8 @@ export const svelteProvider: PreviewProvider = {
             dependencyVersions: input.dependencyVersions,
             mountScript,
             headInjection: buildCssHeadInjection(input.cssFrameworks),
-            mountElementId: input.mountElementId
+            mountElementId: input.mountElementId,
+            aliases: input.aliases
         });
 
         return { document };

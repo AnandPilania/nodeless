@@ -42,7 +42,7 @@ export const reactProvider: PreviewProvider = {
     },
 
     async compile(input: PreviewCompileInput): Promise<PreviewCompileOutput> {
-        const bundle = buildGraphBundle(input.entryPath, input.modules, transpile);
+        const bundle = buildGraphBundle(input.entryPath, input.modules, transpile, input.aliases ?? []);
 
         const externals = new Set(bundle.externalSpecifiers);
         externals.add("react");
@@ -105,7 +105,8 @@ export const reactProvider: PreviewProvider = {
             dependencyVersions: input.dependencyVersions,
             mountScript,
             headInjection: buildCssHeadInjection(input.cssFrameworks),
-            mountElementId
+            mountElementId,
+            aliases: input.aliases
         });
 
         return { document };
