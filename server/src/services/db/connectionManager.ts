@@ -33,7 +33,7 @@ export class DbConnectionManager {
             case "mongodb":
                 return new MongodbAdapter(config);
             case "sqlite":
-                return new SqliteAdapter(config);
+            // return new SqliteAdapter(config);
             default:
                 throw new Error(`Unsupported driver: ${config.driver}`);
         }

@@ -52,8 +52,8 @@ select {
 }
 
 ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 4px;
+    height: 4px;
 }
 
 ::-webkit-scrollbar-track {
@@ -62,7 +62,7 @@ select {
 
 ::-webkit-scrollbar-thumb {
     background: var(--border-strong);
-    border-radius: 5px;
+    border-radius: 2px;
 }
 
 .app-shell {

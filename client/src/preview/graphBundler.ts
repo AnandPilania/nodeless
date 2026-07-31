@@ -1,4 +1,5 @@
-import type { VirtualModule } from "./types";
+import { flattenScssNesting } from "./scssFlatten";
+import type { AliasEntry, VirtualModule } from "./types";
 
 export interface GraphBundleOutput {
     entryModuleId: string;
@@ -8,7 +9,26 @@ export interface GraphBundleOutput {
 
 export type TranspileFn = (filePath: string, source: string) => string;
 
-const KNOWN_EXTENSIONS = [".tsx", ".ts", ".jsx", ".js", ".mjs", ".vue", ".svelte", ".css", ".json"];
+const KNOWN_EXTENSIONS = [
+    ".tsx",
+    ".ts",
+    ".jsx",
+    ".js",
+    ".mjs",
+    ".vue",
+    ".svelte",
+    ".css",
+    ".scss",
+    ".sass",
+    ".less",
+    ".json"
+];
+
+const STYLESHEET_EXTENSIONS = [".css", ".scss", ".sass", ".less"];
+
+function isStylesheet(moduleId: string): boolean {
+    return STYLESHEET_EXTENSIONS.some((ext) => moduleId.endsWith(ext));
+}
 
 const IMPORT_PATTERN =
     /(?:import\s+(?:[^'"]+?\s+from\s+)?["']([^"']+)["'])|(?:require\(\s*["']([^"']+)["']\s*\))|(?:export\s+(?:\*|\{[^}]*\})\s+from\s+["']([^"']+)["'])/g;
@@ -23,6 +43,23 @@ function stripExtension(id: string): string {
 
 function isRelativeSpecifier(specifier: string): boolean {
     return specifier.startsWith(".") || specifier.startsWith("/");
+}
+
+function resolveAliasSpecifier(specifier: string, aliases: AliasEntry[]): string | null {
+    let best: AliasEntry | null = null;
+    for (const alias of aliases) {
+        const prefix = alias.find;
+        const matchesExactly = specifier === prefix;
+        const matchesWithSlash = specifier.startsWith(prefix.endsWith("/") ? prefix : `${prefix}/`);
+        if (!matchesExactly && !matchesWithSlash) continue;
+        if (!best || prefix.length > best.find.length) {
+            best = alias;
+        }
+    }
+    if (!best) return null;
+
+    const remainder = specifier.slice(best.find.length).replace(/^\/+/, "");
+    return remainder ? `${best.replacementRelative}/${remainder}` : best.replacementRelative;
 }
 
 function resolveRelative(fromModuleId: string, specifier: string): string {
@@ -51,6 +88,16 @@ function findModuleKey(modulesById: Map<string, VirtualModule>, candidateId: str
     }
     if (modulesById.has(candidateId)) return candidateId;
 
+    const lastSlash = stripped.lastIndexOf("/");
+    const dir = lastSlash >= 0 ? stripped.slice(0, lastSlash) : "";
+    const base = lastSlash >= 0 ? stripped.slice(lastSlash + 1) : stripped;
+    if (!base.startsWith("_")) {
+        for (const ext of [".scss", ".sass"]) {
+            const partialPath = dir ? `${dir}/_${base}${ext}` : `_${base}${ext}`;
+            if (modulesById.has(partialPath)) return partialPath;
+        }
+    }
+
     for (const ext of KNOWN_EXTENSIONS) {
         const indexPath = `${stripped}/index${ext}`;
         if (modulesById.has(indexPath)) return indexPath;
@@ -61,7 +108,8 @@ function findModuleKey(modulesById: Map<string, VirtualModule>, candidateId: str
 export function buildGraphBundle(
     entryPath: string,
     modules: VirtualModule[],
-    transpile: TranspileFn
+    transpile: TranspileFn,
+    aliases: AliasEntry[] = []
 ): GraphBundleOutput {
     const modulesById = new Map<string, VirtualModule>();
     for (const mod of modules) {
@@ -80,8 +128,22 @@ export function buildGraphBundle(
         const mod = modulesById.get(moduleId);
         if (!mod) return;
 
-        if (moduleId.endsWith(".css")) {
-            moduleSource[moduleId] = JSON.stringify(mod.content);
+        if (isStylesheet(moduleId)) {
+            const isScssLike = moduleId.endsWith(".scss") || moduleId.endsWith(".sass");
+            const cssContent = isScssLike ? flattenScssNesting(mod.content) : mod.content;
+            moduleSource[moduleId] = JSON.stringify(cssContent);
+
+            const importPattern = /@(?:import|use|forward)\s+["']([^"']+)["']/g;
+            let styleMatch: RegExpExecArray | null;
+            while ((styleMatch = importPattern.exec(mod.content)) !== null) {
+                const specifier = styleMatch[1];
+                if (!specifier.startsWith(".")) continue;
+                const resolvedId = resolveRelative(moduleId, specifier);
+                const actualKey = findModuleKey(modulesById, resolvedId);
+                if (actualKey) {
+                    visit(actualKey);
+                }
+            }
             return;
         }
         if (moduleId.endsWith(".json")) {
@@ -108,9 +170,19 @@ export function buildGraphBundle(
                 if (actualKey) {
                     visit(actualKey);
                 }
-            } else {
-                externalSpecifiers.add(specifier);
+                continue;
             }
+
+            const aliasResolvedId = resolveAliasSpecifier(specifier, aliases);
+            if (aliasResolvedId !== null) {
+                const actualKey = findModuleKey(modulesById, aliasResolvedId);
+                if (actualKey) {
+                    visit(actualKey);
+                    continue;
+                }
+            }
+
+            externalSpecifiers.add(specifier);
         }
 
         moduleSource[moduleId] = transpiled;

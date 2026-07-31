@@ -64,6 +64,7 @@ export interface ShellOptions {
     mountScript: string;
     headInjection: string;
     mountElementId?: string;
+    aliases?: { find: string; replacementRelative: string }[];
 }
 
 export function buildShellDocument(options: ShellOptions): string {
@@ -71,6 +72,7 @@ export function buildShellDocument(options: ShellOptions): string {
     const entryModuleId = safeJsonForScript(options.entryModuleId);
     const externalSpecifiersJson = safeJsonForScript(options.externalSpecifiers);
     const dependencyVersionsJson = safeJsonForScript(options.dependencyVersions);
+    const aliasesJson = safeJsonForScript(options.aliases ?? []);
 
     const needsExtraMountDiv =
         options.mountElementId &&
@@ -115,6 +117,7 @@ export function buildShellDocument(options: ShellOptions): string {
       const entryModuleId = ${entryModuleId};
       const externalSpecifiers = ${externalSpecifiersJson};
       const dependencyVersions = ${dependencyVersionsJson};
+      const aliases = ${aliasesJson};
 
       function reportError(message, stack) {
         const root = document.getElementById("preview-root");
@@ -206,9 +209,34 @@ export function buildShellDocument(options: ShellOptions): string {
 
       const moduleCache = {};
 
+      function resolveAlias(specifier) {
+        var best = null;
+        for (var i = 0; i < aliases.length; i++) {
+          var alias = aliases[i];
+          var prefix = alias.find;
+          var matchesExactly = specifier === prefix;
+          var matchesWithSlash = specifier.indexOf(prefix.charAt(prefix.length - 1) === "/" ? prefix : prefix + "/") === 0;
+          if (!matchesExactly && !matchesWithSlash) continue;
+          if (!best || prefix.length > best.find.length) {
+            best = alias;
+          }
+        }
+        if (!best) return null;
+        var remainder = specifier.slice(best.find.length).replace(/^\/+/, "");
+        return remainder ? best.replacementRelative + "/" + remainder : best.replacementRelative;
+      }
+
       function resolveLocal(fromId, specifier) {
-        const fromDir = fromId.includes("/") ? fromId.slice(0, fromId.lastIndexOf("/")) : "";
-        const combined = (fromDir ? fromDir + "/" + specifier : specifier);
+        var isBareSpecifier = specifier.charAt(0) !== "." && specifier.charAt(0) !== "/";
+        var combined;
+        if (isBareSpecifier) {
+          var aliasResolved = resolveAlias(specifier);
+          if (aliasResolved === null) return null;
+          combined = aliasResolved;
+        } else {
+          const fromDir = fromId.includes("/") ? fromId.slice(0, fromId.lastIndexOf("/")) : "";
+          combined = (fromDir ? fromDir + "/" + specifier : specifier);
+        }
         const parts = combined.split("/");
         const resolved = [];
         for (const part of parts) {
@@ -217,12 +245,18 @@ export function buildShellDocument(options: ShellOptions): string {
           resolved.push(part);
         }
         const joined = resolved.join("/");
-        const stripped = joined.replace(/\\.(tsx|ts|jsx|js|mjs|vue|svelte)$/, "");
+        const stripped = joined.replace(/\\.(tsx|ts|jsx|js|mjs|vue|svelte|css|scss|sass|less)$/, "");
+        const lastSlash = stripped.lastIndexOf("/");
+        const dir = lastSlash >= 0 ? stripped.slice(0, lastSlash) : "";
+        const base = lastSlash >= 0 ? stripped.slice(lastSlash + 1) : stripped;
         const candidates = [
           joined,
           stripped + ".tsx", stripped + ".ts", stripped + ".jsx", stripped + ".js",
           stripped + ".vue", stripped + ".svelte",
-          stripped + ".css", stripped + ".json",
+          stripped + ".css", stripped + ".scss", stripped + ".sass", stripped + ".less",
+          stripped + ".json",
+          dir ? dir + "/_" + base + ".scss" : "_" + base + ".scss",
+          dir ? dir + "/_" + base + ".sass" : "_" + base + ".sass",
           stripped + "/index.tsx", stripped + "/index.ts", stripped + "/index.jsx", stripped + "/index.js"
         ];
         for (const candidate of candidates) {

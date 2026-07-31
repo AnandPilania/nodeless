@@ -3,15 +3,22 @@ export interface VirtualModule {
     content: string;
 }
 
+export interface AliasEntry {
+    find: string;
+    replacementRelative: string;
+}
+
 export interface PreviewCompileInput {
     entryPath: string;
     modules: VirtualModule[];
     dependencyVersions: Record<string, string>;
     cssFrameworks: DetectedCssFramework[];
     mountElementId?: string;
+    aliases?: AliasEntry[];
 }
 
 export interface PreviewCompileOutput {
+    /** Raw HTML document to place in the sandboxed iframe's srcDoc */
     document: string;
 }
 
